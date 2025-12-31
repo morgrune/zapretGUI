@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::thread;
+use std::time::Duration;
 use eframe::egui;
 use std::os::windows::process::CommandExt;
 use std::process::{Command, Child};
@@ -36,8 +38,9 @@ impl Default for ZapretApp {
 
 impl ZapretApp {
     fn get_core_path() -> PathBuf {
-    env::temp_dir().join("zapret_core")
-}
+        // Папка будет: C:\Users\Имя\AppData\Local\Temp\zapret_service_data
+        env::temp_dir().join("zapret_service_data")
+    }
 
     fn unpack_files() -> std::io::Result<()> {
         let core_path = Self::get_core_path();
@@ -86,11 +89,19 @@ impl eframe::App for ZapretApp {
                         .fill(egui::Color32::from_rgb(34, 139, 34))
                         .min_size(egui::vec2(220.0, 45.0));
 
-                    if ui.add(start_btn).clicked() {
-                        Self::kill_all_winws();
-                        if let Err(e) = Self::unpack_files() {
-                            self.status_msg = format!("Ошибка: {}", e);
-                        } else {
+                if ui.add(start_btn).clicked() {
+                    self.status_msg = "Запуск...".to_string();
+                    
+                    // 1. Убиваем старые процессы
+                    Self::kill_all_winws();
+                    
+                    // 2. Ждем 300мс, чтобы ОС освободила файлы
+                    thread::sleep(Duration::from_millis(300));
+
+                    // 3. Распаковываем и запускаем
+                    if let Err(e) = Self::unpack_files() {
+                        self.status_msg = format!("Ошибка доступа: {}", e);
+                    } else {
                             let core_path = Self::get_core_path();
                             let args = [
                                 "--wf-tcp=80,443,2053,2083,2087,2096,8443", "--wf-udp=443,19294-19344,50000-50100",
